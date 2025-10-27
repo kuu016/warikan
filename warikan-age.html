@@ -157,7 +157,7 @@
         <div class="participant-list-header">
             <h2>参加者</h2>
             <button class="add-btn" onclick="addParticipant()">＋ 参加者を追加</button>
-        </div>
+            </div>
         <div id="participants-container">
             </div>
 
@@ -279,10 +279,90 @@
                 const womenPayBase = averagePay * 0.8;
                 
                 // 女性の総支払額 (端数切り捨てで計算し、差額を男性に)
-                // ※ ここでの切り上げ/切り捨て戦略は結果に影響しますが、
-                // ※ 女性の基本額(0.8倍)を先に確定させ、残りを男性が負う ロジックを採用
                 const totalWomenPayment = Math.floor(womenPayBase * numWomen);
                 const totalMenPayment = totalAmount - totalWomenPayment;
 
                 resultLines.push(`(モード: ${mode})`);
+                resultLines.push(`(男性陣の支払総額: ${totalMenPayment}円)`);
+                resultLines.push(`(女性陣の支払総額: ${totalWomenPayment}円)`);
+                resultLines.push("--------------------");
+
+                // ステップ2: 各グループ内で年齢按分
+                
+                // 男性の処理
+                const totalMaleAge = menList.reduce((sum, p) => sum + p.age, 0);
+                if (totalMaleAge > 0) { // 0除算を避ける
+                    menList.forEach(p => {
+                        const rawPay = totalMenPayment * (p.age / totalMaleAge);
+                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
+                        finalPayments.push({ ...p, finalPay });
+                        collectedTotal += finalPay;
+                    });
+                }
+
+                // 女性の処理
+                const totalFemaleAge = womenList.reduce((sum, p) => sum + p.age, 0);
+                if (totalFemaleAge > 0) { // 0除算を避ける
+                    womenList.forEach(p => {
+                        const rawPay = totalWomenPayment * (p.age / totalFemaleAge);
+                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
+                        finalPayments.push({ ...p, finalPay });
+                        collectedTotal += finalPay;
+                    });
+                }
+
+            } 
+            // --- Case 2: 単一性別 (年齢按分 のみ) ---
+            else {
+                mode = "年齢按分 (単一性別)";
+                resultLines.push(`(モード: ${mode})`);
+                resultLines.push("--------------------");
+
+                const group = (numMen > 0) ? menList : womenList;
+                const totalGroupAge = group.reduce((sum, p) => sum + p.age, 0);
+
+                if (totalGroupAge > 0) { // 0除算を避ける
+                    group.forEach(p => {
+                        const rawPay = totalAmount * (p.age / totalGroupAge);
+                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
+                        finalPayments.push({ ...p, finalPay });
+                        collectedTotal += finalPay;
+                    });
+                } else if (totalPeople > 0) {
+                    // 年齢が全員0 (エラーで弾かれるはず) だが、念のため均等割り勘
+                    const finalPay = Math.ceil(totalAmount / totalPeople);
+                    group.forEach(p => {
+                        finalPayments.push({ ...p, finalPay });
+                        collectedTotal += finalPay;
+                    });
+                }
+            }
+
+            // --- 結果のソートと表示 ---
+            
+            // PDF に従い、(性別→)年齢昇順にソート
+            finalPayments.sort((a, b) => {
+                if (a.gender !== b.gender) {
+                    return a.gender === 'male' ? -1 : 1; // 男性が先
+                }
+                return a.age - b.age; // 年齢昇順
+            });
+
+            // 最終結果 の形式で表示
+            finalPayments.forEach(p => {
+                const genderLabel = p.gender === 'male' ? '男性' : '女性';
                 resultLines.push(
+                    `${p.name} (${p.age}歳 ${genderLabel}): ${p.finalPay}円`
+                );
+            });
+
+            // --- 合計表示 ---
+            resultLines.push("--------------------");
+            resultLines.push(`徴収総額: ${collectedTotal}円`);
+            
+            if (collectedTotal > totalAmount) {
+                resultLines.push(`(お釣り: ${collectedTotal - totalAmount}円)`);
+            } else if (collectedTotal < totalAmount && totalPeople > 0) {
+                // 切り上げロジックでも、合計が不足するケース（主に丸め誤差）
+                resultLines.push(`**警告: ${totalAmount - collectedTotal}円 不足**`);
+                resultLines.push(`(不足分は幹事が調整してください)`);
