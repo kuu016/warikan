@@ -33,7 +33,6 @@
             color: #2c3e50;
             margin-top: 0;
             margin-bottom: 25px;
-            /* WARIKAN のタイトル */
         }
 
         .form-group {
@@ -54,16 +53,14 @@
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 6px;
-            box-sizing: border-box; /* パディングを含めて幅100%にする */
+            box-sizing: border-box;
         }
 
-        /* 合計金額 */
         .total-amount-group {
             border-bottom: 2px dashed #eee;
             padding-bottom: 20px;
         }
 
-        /* 人数・参加者リスト */
         .participant-list-header {
             display: flex;
             justify-content: space-between;
@@ -129,14 +126,13 @@
             margin-top: 20px;
         }
 
-        /* 結果表示エリア */
         #results {
             margin-top: 25px;
             background: #f0f0f0;
             border: 1px solid #ddd;
             border-radius: 6px;
             padding: 20px;
-            white-space: pre-wrap; /* 改行をそのまま表示 */
+            white-space: pre-wrap;
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             line-height: 1.6;
             color: #222;
@@ -156,8 +152,9 @@
 
         <div class="participant-list-header">
             <h2>参加者</h2>
+            
             <button class="add-btn" onclick="addParticipant()">＋ 参加者を追加</button>
-            </div>
+        </div>
         <div id="participants-container">
             </div>
 
@@ -274,7 +271,6 @@
                 mode = "性別傾斜 ＋ 年齢按分";
                 
                 // ステップ1: 性別ごとの「支払うべき総額」を計算
-                // PDF の wopay == (total/member) * 0.8 に基づく
                 const averagePay = totalAmount / totalPeople;
                 const womenPayBase = averagePay * 0.8;
                 
@@ -363,6 +359,18 @@
             if (collectedTotal > totalAmount) {
                 resultLines.push(`(お釣り: ${collectedTotal - totalAmount}円)`);
             } else if (collectedTotal < totalAmount && totalPeople > 0) {
-                // 切り上げロジックでも、合計が不足するケース（主に丸め誤差）
+                // 端数処理による不足
                 resultLines.push(`**警告: ${totalAmount - collectedTotal}円 不足**`);
                 resultLines.push(`(不足分は幹事が調整してください)`);
+            }
+            
+            return resultLines.join('\n');
+        }
+
+        // 初期状態で参加者を2人追加しておく
+        addParticipant();
+        addParticipant();
+    </script>
+    
+</body>
+</html>
