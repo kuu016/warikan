@@ -33,7 +33,6 @@
             color: #2c3e50;
             margin-top: 0;
             margin-bottom: 25px;
-            [cite_start]/* [cite: 3] WARIKAN のタイトル */
         }
 
         .form-group {
@@ -57,13 +56,11 @@
             box-sizing: border-box; /* パディングを含めて幅100%にする */
         }
 
-        /* 合計金額 */
         .total-amount-group {
             border-bottom: 2px dashed #eee;
             padding-bottom: 20px;
         }
 
-        [cite_start]/* [cite: 6, 7, 8, 9, 10, 11, 12, 13] 人数・参加者リスト */
         .participant-list-header {
             display: flex;
             justify-content: space-between;
@@ -107,13 +104,13 @@
         }
 
         button.add-btn {
-            background-color: #34c759;
+            background-color: #34c759; /* 緑色の追加ボタン */
             font-size: 14px;
             padding: 8px 12px;
         }
 
         button.remove-btn {
-            background-color: #ff3b30;
+            background-color: #ff3b30; /* 赤色の削除ボタン */
             padding: 8px 12px;
             font-size: 14px;
         }
@@ -129,7 +126,6 @@
             margin-top: 20px;
         }
 
-        [cite_start]/* [cite: 14, 15] 結果表示エリア */
         #results {
             margin-top: 25px;
             background: #f0f0f0;
@@ -173,7 +169,6 @@
 
         /**
          * 参加者入力欄を動的に追加します。
-         * PDF  に基づくUI。
          */
         function addParticipant() {
             participantCount++;
@@ -200,194 +195,6 @@
             const resultsDiv = document.getElementById('results');
             
             try {
-                // 1. 合計金額を取得 
+                // 1. 合計金額を取得
                 const totalAmount = parseInt(document.getElementById('total-amount').value);
-                if (isNaN(totalAmount) || totalAmount <= 0) {
-                    throw new Error("合計金額を正しく入力してください。");
-                }
-
-                // ▼▼▼ 年齢機能追加 (2) ▼▼▼
-                // 参加者の「人数」だけでなく、「名前」「歳」「性別」を
-                // オブジェクトの配列として収集するよう変更
-                
-                const participantRows = document.querySelectorAll('.participant-row');
-                const participants = []; // ここに {name, age, gender} を格納
-                let errorInLoop = false;
-
-                participantRows.forEach((row, index) => {
-                    const name = row.querySelector('.participant-name').value || `参加者 ${index + 1}`;
-                    const age = parseInt(row.querySelector('.participant-age').value);
-                    const gender = row.querySelector('.participant-gender').value;
-
-                    // 年齢が 1 以上で入力されているかチェック
-                    if (isNaN(age) || age <= 0) {
-                        errorInLoop = true;
-                    }
-                    
-                    participants.push({ name, age, gender });
-                });
-
-                if (errorInLoop) {
-                    throw new Error("全員の「歳」を1以上の半角数字で入力してください。\n(年齢0歳は計算に使用できません)");
-                }
-                
-                // 3. 計算ロジックを実行
-                // (引数を numMen, numWomen から participants 配列に変更)
-                const resultText = calculateWarikanLogic(totalAmount, participants);
-                // ▲▲▲ 年齢機能追加 (2) ▲▲▲
-                
-                // 4. 結果を表示
-                resultsDiv.innerText = resultText;
-
-            } catch (error) {
-                resultsDiv.innerText = `エラー: ${error.message}`;
-            }
-        }
-
-        // ▼▼▼ 年齢機能追加 (3) ▼▼▼
-        // calculateWarikanLogic 関数を、年齢按分ロジックに「総入れ替え」します。
-        // 引数が (totalAmount, numMen, numWomen) から (totalAmount, participants) に変更されています。
-        /**
-         * 支払金額を算出するコアロジック。
-         * [cite_start]ステップ1: 性別で総額を傾斜 (女性0.8倍、男性残り) [cite: 17, 18]
-         * [cite_start]ステップ2: 各性別内で年齢比により按分 [cite: 19]
-         */
-        function calculateWarikanLogic(totalAmount, participants) {
-            
-            // 参加者配列から男性・女性リストを作成
-            const menList = participants.filter(p => p.gender === 'male');
-            const womenList = participants.filter(p => p.gender === 'female');
-            
-            const numMen = menList.length;
-            const numWomen = womenList.length;
-            const totalPeople = numMen + numWomen;
-
-            // --- 0. エッジケース処理 ---
-            if (totalPeople === 0) {
-                throw new Error("参加者がいません。");
-            }
-
-            let resultLines = [];
-            resultLines.push("--- 支払金額算出結果 ---");
-            resultLines.push(`合計金額: ${totalAmount}円`);
-            resultLines.push(`(男性 ${numMen}人, 女性 ${numWomen}人)`);
-            resultLines.push("--------------------");
-
-            let finalPayments = []; // {name, age, gender, finalPay} の配列
-            let collectedTotal = 0; // 徴収合計（お釣り計算用）
-            let mode = "";
-
-            // --- Case 1: 男女混合 (性別傾斜 -> 年齢按分) ---
-            if (numMen > 0 && numWomen > 0) {
-                mode = "性別傾斜 ＋ 年齢按分";
-                
-                [cite_start]// ステップ1: 性別ごとの「支払うべき総額」を計算 [cite: 17, 18]
-                const averagePay = totalAmount / totalPeople;
-                const womenPayBase = averagePay * 0.8;
-                
-                // 女性の総支払額 (端数切り捨て)
-                const totalWomenPayment = Math.floor(womenPayBase * numWomen);
-                // 男性の総支払額 (残り全額)
-                const totalMenPayment = totalAmount - totalWomenPayment;
-
-                resultLines.push(`(モード: ${mode})`);
-                resultLines.push(`(男性陣の支払総額: ${totalMenPayment}円)`);
-                resultLines.push(`(女性陣の支払総額: ${totalWomenPayment}円)`);
-                resultLines.push("--------------------");
-
-                [cite_start]// ステップ2: 各グループ内で年齢按分 [cite: 19]
-                
-                // 男性の処理
-                const totalMaleAge = menList.reduce((sum, p) => sum + p.age, 0);
-                if (totalMaleAge > 0) { 
-                    menList.forEach(p => {
-                        // (男性総額) * (個人の年齢 / 男性の年齢合計)
-                        const rawPay = totalMenPayment * (p.age / totalMaleAge);
-                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
-                        finalPayments.push({ ...p, finalPay });
-                        collectedTotal += finalPay;
-                    });
-                }
-
-                // 女性の処理
-                const totalFemaleAge = womenList.reduce((sum, p) => sum + p.age, 0);
-                if (totalFemaleAge > 0) {
-                    womenList.forEach(p => {
-                        // (女性総額) * (個人の年齢 / 女性の年齢合計)
-                        const rawPay = totalWomenPayment * (p.age / totalFemaleAge);
-                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
-                        finalPayments.push({ ...p, finalPay });
-                        collectedTotal += finalPay;
-                    });
-                }
-            } 
-            // --- Case 2: 単一性別 (年齢按分 のみ) ---
-            else {
-                mode = "年齢按分 (単一性別)";
-                resultLines.push(`(モード: ${mode})`);
-                resultLines.push("--------------------");
-
-                // 参加者全員 (男性のみ or 女性のみ)
-                const group = (numMen > 0) ? menList : womenList;
-                const totalGroupAge = group.reduce((sum, p) => sum + p.age, 0);
-
-                if (totalGroupAge > 0) { // 0除算を避ける
-                    group.forEach(p => {
-                        // (合計金額) * (個人の年齢 / 全員の年齢合計)
-                        const rawPay = totalAmount * (p.age / totalGroupAge);
-                        const finalPay = Math.ceil(rawPay); // 個別に切り上げ
-                        finalPayments.push({ ...p, finalPay });
-                        collectedTotal += finalPay;
-                    });
-                } else if (totalPeople > 0) {
-                    [cite_start]// (発生しないはずだが) 万が一年齢合計0なら単純割り勘 [cite: 4]
-                    const finalPay = Math.ceil(totalAmount / totalPeople);
-                    group.forEach(p => {
-                        finalPayments.push({ ...p, finalPay });
-                        collectedTotal += finalPay;
-                    });
-                }
-            }
-
-            [cite_start]// --- 結果のソートと表示 [cite: 19] ---
-            
-            // PDFの指示「年齢は昇順に並べて」に基づきソート
-            // (性別 -> 年齢昇順)
-            finalPayments.sort((a, b) => {
-                if (a.gender !== b.gender) {
-                    return a.gender === 'male' ? -1 : 1; // 男性が先
-                }
-                return a.age - b.age; // 年齢昇順
-            });
-
-            [cite_start]// 最終結果 [cite: 14, 15] の形式で表示
-            finalPayments.forEach(p => {
-                const genderLabel = p.gender === 'male' ? '男性' : '女性';
-                resultLines.push(
-                    `${p.name} (${p.age}歳 ${genderLabel}): ${p.finalPay}円`
-                );
-            });
-
-            // --- 合計表示 ---
-            resultLines.push("--------------------");
-            resultLines.push(`徴収総額: ${collectedTotal}円`);
-            
-            if (collectedTotal > totalAmount) {
-                resultLines.push(`(お釣り: ${collectedTotal - totalAmount}円)`);
-            } else if (collectedTotal < totalAmount && totalPeople > 0) {
-                // 端数処理による不足
-                resultLines.push(`**警告: ${totalAmount - collectedTotal}円 不足**`);
-                resultLines.push(`(不足分は幹事が調整してください)`);
-            }
-            
-            return resultLines.join('\n');
-        }
-        // ▲▲▲ 年齢機能追加 (3) ▲▲▲
-
-        // 初期状態で参加者を2人追加しておく (テストしやすくするため)
-        addParticipant();
-        addParticipant();
-    </script>
-
-</body>
-</html>
+                if (
