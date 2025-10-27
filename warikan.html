@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WARIKAN 支払金額算出</title>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            padding: 25px 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 25px;
+            /* [cite: 3] WARIKAN のタイトル */
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box; /* パディングを含めて幅100%にする */
+        }
+
+        /*  合計金額 */
+        .total-amount-group {
+            border-bottom: 2px dashed #eee;
+            padding-bottom: 20px;
+        }
+
+        /* [cite: 6, 7, 8, 9, 10, 11, 12, 13] 人数・参加者リスト */
+        .participant-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #participants-container {
+            margin-top: 15px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .participant-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1.5fr 0.5fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+
+        .participant-row input,
+        .participant-row select {
+            padding: 8px;
+        }
+
+        button {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button.add-btn {
+            background-color: #34c759;
+            font-size: 14px;
+            padding: 8px 12px;
+        }
+
+        button.remove-btn {
+            background-color: #ff3b30;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button.calculate-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+
+        /* [cite: 14, 15] 結果表示エリア */
+        #results {
+            margin-top: 25px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            white-space: pre-wrap; /* 改行をそのまま表示 */
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            line-height: 1.6;
+            color: #222;
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>WARIKAN [cite: 3]</h1>
+
+        <div class="form-group total-amount-group">
+            <label for="total-amount">合計金額 (円)</label>
+            <input type="number" id="total-amount" placeholder="例: 10000">
+        </div>
+
+        <div class="participant-list-header">
+            <h2>参加者 [cite: 6]</h2>
+            <button class="add-btn" onclick="addParticipant()">＋ 参加者を追加</button>
+        </div>
+        <div id="participants-container">
+            </div>
+
+        <button class="calculate-btn" onclick="calculateAndDisplay()">計算する</button>
+
+        <div id="results">
+            計算結果がここに表示されます。
+        </div>
+    </div>
+
+    <script>
+        let participantCount = 0;
+
+        /**
+         * 参加者入力欄を動的に追加します。
+         * PDF  に基づくUI。
+         */
+        function addParticipant() {
+            participantCount++;
+            const container = document.getElementById('participants-container');
+            
+            const row = document.createElement('div');
+            row.className = 'participant-row';
+            row.innerHTML = `
+                <input type="text" class="participant-name" placeholder="名前 ${participantCount}">
+                <input type="number" class="participant-age" placeholder="歳">
+                <select class="participant-gender">
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                </select>
+                <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+            `;
+            container.appendChild(row);
+        }
+
+        /**
+         * メインの計算処理を呼び出し、結果を表示します。
+         */
+        function calculateAndDisplay() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                // 1. 合計金額を取得 
+                const totalAmount = parseInt(document.getElementById('total-amount').value);
+                if (isNaN(totalAmount) || totalAmount <= 0) {
+                    throw new Error("合計金額を正しく入力してください。");
+                }
+
+                // 2. 参加者の性別  を集計
+                const participants = document.querySelectorAll('.participant-row');
+                let numMen = 0;
+                let numWomen = 0;
+
+                participants.forEach(row => {
+                    const gender = row.querySelector('.participant-gender').value;
+                    if (gender === 'male') {
+                        numMen++;
+                    } else if (gender === 'female') {
+                        numWomen++;
+                    }
+                });
+
+                // 3. 計算ロジックを実行
+                const resultText = calculateWarikanLogic(totalAmount, numMen, numWomen);
+                
+                // 4. 結果を表示
+                resultsDiv.innerText = resultText;
+
+            } catch (error) {
+                resultsDiv.innerText = `エラー: ${error.message}`;
+            }
+        }
+
+        /**
+         * 支払金額を算出するコアロジック。
+         * (PythonコードをJSに移植)
+         * * PDFの以下のロジックに基づき、解釈して実装
+         *  wopay == (total/member) * 0.8
+         * [cite: 18] menpay == (total - (wopay * women-member)) / (men-member)
+         * -> menpay = (total - (wopay * women_count)) / men_count と解釈
+         */
+        function calculateWarikanLogic(totalAmount, numMen, numWomen) {
+            const totalPeople = numMen + numWomen;
+
+            // --- 0. エッジケース処理 ---
+            if (totalPeople === 0) {
+                throw new Error("参加者がいません。");
+            }
+
+            let resultLines = [];
+            resultLines.push("--- 支払金額算出結果 ---");
+
+            // --- 1. 単純割り勘 (男女どちらかが0人の場合) ---
+            // (合計金額/合計人数) [cite: 4] に基づく
+            if (numMen === 0 || numWomen === 0) {
+                // 常に切り上げ
+                const payPerPerson = Math.ceil(totalAmount / totalPeople);
+                
+                resultLines.push("モード: 単純割り勘");
+                resultLines.push(`合計金額: ${totalAmount}円`);
+                resultLines.push(`参加者: ${totalPeople}人`);
+                resultLines.push("--------------------");
+                resultLines.push(`1人あたり: ${payPerPerson}円`);
+                resultLines.push("--------------------");
+                resultLines.push(`徴収総額: ${payPerPerson * totalPeople}円`);
+            
+            } else {
+                // --- 2. 性別ベースの割り勘 (男女とも1人以上) ---
+                
+                //  に基づく計算
+                const averagePay = totalAmount / totalPeople;
+                const womenPayRaw = averagePay * 0.8;
+
+                // 女性の支払額を先に決定 (1円単位で切り上げ)
+                const womenPayFinal = Math.ceil(womenPayRaw);
+                
+                // 女性の支払総額
+                const totalWomenPayment = womenPayFinal * numWomen;
+
+                // 男性の支払総額 (残り全額)
+                const totalMenPayment = totalAmount - totalWomenPayment;
+
+                // [cite: 18] の解釈に基づく計算
+                // 男性の人数で割り、端数は男性が負担 (切り上げ)
+                const menPayFinal = Math.ceil(totalMenPayment / numMen);
+
+                // --- 3. 結果表示 ---
+                resultLines.push("モード: 性別傾斜");
+                resultLines.push(`合計金額: ${totalAmount}円`);
+                resultLines.push(`男性: ${numMen}人, 女性: ${numWomen}人 (合計: ${totalPeople}人)`);
+                resultLines.push("--------------------");
+                resultLines.push(`女性 (1人あたり): ${womenPayFinal}円`);
+                resultLines.push(`男性 (1人あたり): ${menPayFinal}円`);
+                resultLines.push("--------------------");
+                
+                const collectedWomen = womenPayFinal * numWomen;
+                const collectedMen = menPayFinal * numMen;
+                const collectedTotal = collectedWomen + collectedMen;
+                
+                resultLines.push(`女性合計: ${collectedWomen}円`);
+                resultLines.push(`男性合計: ${collectedMen}円`);
+                resultLines.push(`徴収総額: ${collectedTotal}円`);
+                
+                if (collectedTotal > totalAmount) {
+                    resultLines.push(`(お釣り: ${collectedTotal - totalAmount}円)`);
+                }
+            }
+            
+            return resultLines.join('\n');
+        }
+
+        // 初期状態で参加者を1人追加しておく
+        addParticipant();
+    </script>
+
+</body>
+</html>
